@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Süreli Hafıza Kartı Oyunu</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            color: white;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .skor-tablosu {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        .oyun-alani {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            grid-gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .kart {
+            width: 80px;
+            height: 80px;
+            background-color: #2d3436;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            cursor: pointer;
+            transform: scale(1);
+            transform-style: preserve-3d;
+            transition: transform 0.3s ease, background-color 0.3s;
+            user-select: none;
+        }
+
+        .kart:active {
+            transform: scale(0.95);
+        }
+
+        .kart .icerik {
+            display: none;
+        }
+
+        .kart.acik {
+            background-color: white;
+            transform: rotateY(180deg);
+        }
+
+        .kart.acik .icerik {
+            display: block;
+            transform: rotateY(180deg);
+        }
+
+        .kart.esleşti {
+            background-color: #55efc4;
+            cursor: default;
+        }
+
+        .kart.esleşti .icerik {
+            display: block;
+        }
+
+        #yeniden-baslat {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: #00b894;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: 0.2s;
+        }
+
+        #yeniden-baslat:hover {
+            background-color: #00cec9;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Hafıza Kartı Oyunu</h2>
+    
+    <div class="skor-tablosu">
+        Süre: <span id="sure">0</span> sn | Hamle: <span id="hamle">0</span> | Eşleşen: <span id="skor">0</span>/8
+    </div>
+
+    <div class="oyun-alani" id="oyun-alani"></div>
+
+    <button id="yeniden-baslat">Yeniden Başlat</button>
+
+    <script>
+        const emojiler = ['🍕', '🍔', '🍟', '🍦', '🍩', '🍓', '🍉', '🥑', '🍕', '🍔', '🍟', '🍦', '🍩', '🍓', '🍉', '🥑'];
+        
+        let acikKartlar = [];
+        let hamleSayisi = 0;
+        let eslesmeSayisi = 0;
+        let kilitli = false;
+        
+        // Süre değişkenleri
+        let saniye = 0;
+        let zamanlayiciInterval = null;
+
+        const oyunAlani = document.getElementById('oyun-alani');
+        const hamleYazisi = document.getElementById('hamle');
+        const skorYazisi = document.getElementById('skor');
+        const sureYazisi = document.getElementById('sure');
+        const restartBtn = document.getElementById('yeniden-baslat');
+
+        function kartlariKaristir(dizi) {
+            for (let i = dizi.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [dizi[i], dizi[j]] = [dizi[j], dizi[i]];
+            }
+            return dizi;
+        }
+
+        // Süreyi başlatan fonksiyon
+        function sureyiBaslat() {
+            // Eğer eski bir zamanlayıcı varsa önce onu temizle
+            if (zamanlayiciInterval) clearInterval(zamanlayiciInterval);
+            
+            saniye = 0;
+            sureYazisi.innerText = saniye;
+
+            // Her 1 saniyede (1000 milisaniye) süreyi 1 artırır
+            zamanlayiciInterval = setInterval(() => {
+                saniye++;
+                sureYazisi.innerText = saniye;
+            }, 1000);
+        }
+
+        function oyunuKur() {
+            oyunAlani.innerHTML = '';
+            acikKartlar = [];
+            hamleSayisi = 0;
+            eslesmeSayisi = 0;
+            kilitli = false;
+            
+            hamleYazisi.innerText = hamleSayisi;
+            skorYazisi.innerText = eslesmeSayisi;
+
+            // Oyunu kurarken süreyi de baştan başlatıyoruz
+            sureyiBaslat();
+
+            const karisikEmojiler = kartlariKaristir([...emojiler]);
+
+            karisikEmojiler.forEach((emoji, indeks) => {
+                const kart = document.createElement('div');
+                kart.classList.add('kart');
+                kart.dataset.indeks = indeks;
+                
+                const icerik = document.createElement('span');
+                icerik.classList.add('icerik');
+                icerik.innerText = emoji;
+                
+                kart.appendChild(icerik);
+                kart.addEventListener('click', kartiAc);
+                oyunAlani.appendChild(kart);
+            });
+        }
+
+        function kartiAc() {
+            if (kilitli) return;
+            if (this.classList.contains('acik') || this.classList.contains('esleşti')) return;
+
+            this.classList.add('acik');
+            acikKartlar.push(this);
+
+            if (acikKartlar.length === 2) {
+                hamleSayisi++;
+                hamleYazisi.innerText = hamleSayisi;
+                eslesmeKontrolu();
+            }
+        }
+
+        function eslesmeKontrolu() {
+            kilitli = true;
+            const [kart1, kart2] = acikKartlar;
+            const emoji1 = kart1.querySelector('.icerik').innerText;
+            const emoji2 = kart2.querySelector('.icerik').innerText;
+
+            if (emoji1 === emoji2) {
+                kart1.classList.add('esleşti');
+                kart2.classList.add('esleşti');
+                eslesmeSayisi++;
+                skorYazisi.innerText = eslesmeSayisi;
+                
+                acikKartlar = [];
+                kilitli = false;
+
+                if (eslesmeSayisi === 8) {
+                    // Tüm kartlar eşleşince süreyi durduruyoruz
+                    clearInterval(zamanlayiciInterval);
+                    setTimeout(() => {
+                        alert(`Tebrikler! 🎉\n${hamleSayisi} hamlede ve tam ${saniye} saniyede bitirdiniz!`);
+                    }, 500);
+                }
+            } else {
+                setTimeout(() => {
+                    kart1.classList.remove('acik');
+                    kart2.classList.remove('acik');
+                    acikKartlar = [];
+                    kilitli = false;
+                }, 1000);
+            }
+        }
+
+        restartBtn.addEventListener('click', oyunuKur);
+        oyunuKur();
+    </script>
+</body>
+</html>
